@@ -1,0 +1,64 @@
+---
+description: "This rule defines the standard project structure for Python projects, including the use of `src/` layout, `tests/` directory, configuration file placement, and essential files like `README.md`, `LICENSE`, and `.gitignore`. Apply this rule when initiating a new Python project, restructuring an existing one, or discussing project layout conventions."
+globs: ""
+alwaysApply: false
+---
+
+# Standard Python Project Structure
+
+## Critical Rules
+
+- Use a standard project layout. The `src` layout is preferred for libraries/applications.
+- Main application/library code resides within a `src/` directory (e.g., `src/my_package/`).
+- Tests reside in a top-level `tests/` directory, mirroring the `src/` structure.
+- Include a `README.md` file at the root with project description, setup, and usage instructions.
+- Include a `LICENSE` file specifying the project's license.
+- Include a `.gitignore` file to exclude common files (e.g., `.venv/`, `__pycache__/`, `.pytest_cache/`, build artifacts).
+- Configuration files (e.g., `pyproject.toml`, `ruff.toml`, `.env`) should be at the project root.
+- Documentation (if any) should be in a top-level `docs/` directory.
+- Scripts (if any) for utility tasks can be placed in a top-level `scripts/` directory.
+
+## Examples
+
+<example>
+  ```
+  my_project/
+  ├── .git/
+  ├── .gitignore
+  ├── .venv/ (created by uv, listed in .gitignore)
+  ├── docs/
+  │   └── index.md
+  ├── scripts/
+  │   └── deploy.sh
+  ├── src/
+  │   └── my_package/
+  │       ├── __init__.py
+  │       ├── module1.py
+  │       └── subpackage/
+  │           └── __init__.py
+  ├── tests/
+  │   ├── __init__.py
+  │   ├── test_module1.py
+  │   └── subpackage/
+  │       └── test_submodule.py
+  ├── LICENSE
+  ├── README.md
+  ├── pyproject.toml (or ruff.toml)
+  ├── requirements.txt
+  └── requirements.lock.txt
+  ```
+</example>
+
+<example type="invalid">
+  ```
+  messy_project/
+  ├── my_package/ # Source code mixed with tests and scripts
+  │   ├── module1.py
+  │   ├── test_module1.py # Test file inside source
+  │   └── deploy.sh     # Script inside source
+  ├── requirements.txt
+  ├── main_script.py  # Application entry point at root
+  └── README.txt      # Incorrect README format
+  # Missing .gitignore, LICENSE, pyproject.toml, tests directory
+  ```
+</example>

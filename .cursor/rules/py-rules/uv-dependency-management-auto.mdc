@@ -1,0 +1,59 @@
+---
+description: ""
+globs: requirements.txt, requirements.lock.txt, pyproject.toml
+alwaysApply: false
+---
+
+# uv Dependency and Environment Management
+
+## Critical Rules
+
+- Use `uv` for managing Python virtual environments and package installations.
+- Create a virtual environment for each project: `uv venv`
+- Activate the virtual environment before installing packages (e.g., `source .venv/bin/activate`).
+- Install packages using `uv pip install <package>` or from a requirements file `uv pip install -r requirements.txt`.
+- Maintain project dependencies in `requirements.txt` (or `pyproject.toml` if using build backends that support it).
+- Generate a locked dependency file for reproducible environments: `uv pip freeze > requirements.lock.txt` or `uv pip compile requirements.txt > requirements.lock.txt`.
+- Install from the lock file in CI/CD and deployment environments: `uv pip sync requirements.lock.txt`.
+- Regularly update dependencies and regenerate the lock file.
+- Add the virtual environment directory (e.g., `.venv/`) to `.gitignore`.
+
+## Examples
+
+<example>
+  ```bash
+  # Set up a new project environment
+  uv venv .venv --seed # Create virtual environment
+  source .venv/bin/activate # Activate environment
+  
+# Install packages and create requirements files
+
+  uv pip install "flask>=2.0" pandas "requests[security]"
+  uv pip freeze > requirements.txt # Save direct dependencies
+  uv pip compile requirements.txt > requirements.lock.txt # Create lock file
+  
+# Later, sync environment from lock file (e.g., in CI)
+
+  uv pip sync requirements.lock.txt
+
+  ```
+  *Associated `.gitignore` would contain `.venv/`*
+</example>
+
+<example type="invalid">
+  ```bash
+  # Installing packages globally (not using a virtual environment)
+  pip install flask pandas # Mixing pip and uv, installing globally
+  
+  # Not activating the environment
+  uv venv .venv 
+  uv pip install requests # Installs globally if .venv not activated
+  
+  # Not using a lock file for reproducibility
+  uv pip install -r requirements.txt # Installs latest compatible, not locked versions
+  
+  # Committing the .venv directory to git (missing in .gitignore)
+  git add .venv 
+  ```
+
+</example>

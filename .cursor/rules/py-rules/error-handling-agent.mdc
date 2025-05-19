@@ -1,0 +1,137 @@
+---
+description: "This rule outlines best practices for handling errors and exceptions in Python. Apply when writing code that might fail, implementing try/except blocks, defining custom exceptions, or discussing error handling strategies to ensure robustness and maintainability."
+globs: ""
+alwaysApply: false
+---
+
+# Python Error Handling Best Practices
+
+## Critical Rules
+
+- **Use Exceptions for Errors:** Use exceptions for exceptional circumstances, not for normal control flow.
+- **Be Specific:** Catch specific exception types (`ValueError`, `TypeError`, `KeyError`, etc.) rather than broad `Exception` or bare `except:`. Catching `BaseException` is almost always wrong.
+- **Handle or Re-raise:** If you catch an exception, either handle it appropriately (e.g., log it, return a default value, clean up resources) or re-raise it (`raise` without arguments inside the `except` block) to propagate the error up the call stack.
+- **Cleanup with `finally`:** Use the `finally` block for cleanup actions (e.g., closing files, releasing locks) that must execute regardless of whether an exception occurred.
+- **Context Managers (`with` statement):** Prefer using context managers (`with open(...)`, `with lock:`) for resources that need cleanup, as they handle exceptions and cleanup automatically.
+- **Custom Exceptions:** Define custom exception classes inheriting from standard exceptions (like `Exception` or `ValueError`) for application-specific errors. This allows callers to catch specific application errors.
+- **Avoid Silent Failures:** Do not swallow exceptions with a bare `except: pass` unless there is a very specific and justifiable reason (and it should be documented).
+- **Log Exceptions:** When handling an exception, log it (preferably using `logging.exception()` or `logging.error(..., exc_info=True)`) to record the error and traceback for debugging.
+- **Fail Fast:** Validate inputs early and raise exceptions immediately if preconditions are not met, rather than letting errors propagate far from their source.
+
+## Examples
+
+<example>
+  ```python
+  import logging
+  import json
+
+  logger = logging.getLogger(**name**)
+
+  class ConfigError(Exception):
+      """Custom exception for configuration loading errors."""
+      pass
+
+  def load_config(path: str) -> dict:
+      """Loads configuration from a JSON file.
+
+      Args:
+          path: The path to the configuration file.
+
+      Returns:
+          The loaded configuration dictionary.
+
+      Raises:
+          ConfigError: If the file cannot be found, read, or parsed, 
+                       or if essential keys are missing.
+      """
+      file_handle = None # For demonstration; 'with' is preferred
+      try:
+          file_handle = open(path, 'r')
+          config_data = json.load(file_handle)
+          # Fail fast validation
+          if "api_key" not in config_data:
+              raise ConfigError(f"Missing 'api_key' in config file: {path}")
+          logger.info(f"Configuration loaded successfully from {path}")
+          return config_data
+      except FileNotFoundError as e:
+          logger.error(f"Config file not found: {path}", exc_info=True)
+          raise ConfigError(f"Configuration file not found: {path}") from e
+      except json.JSONDecodeError as e:
+          logger.error(f"Error decoding JSON from config file: {path}", exc_info=True)
+          raise ConfigError(f"Invalid JSON in configuration file: {path}") from e
+      except IOError as e:
+          logger.error(f"Error reading config file: {path}", exc_info=True)
+          raise ConfigError(f"Could not read configuration file: {path}") from e
+      except ConfigError: # Re-raise specific custom exceptions
+          raise
+      except Exception as e: # Catch unexpected broader exceptions last
+          logger.exception(f"An unexpected error occurred while loading config: {path}")
+          raise ConfigError(f"Unexpected error loading config: {path}") from e
+      finally:
+          # Cleanup using finally (though 'with open()' is better)
+          if file_handle:
+              try:
+                  file_handle.close()
+                  logger.debug(f"Closed config file handle for {path}")
+              except IOError:
+                  logger.error(f"Error closing config file handle for {path}", exc_info=True)
+
+# Preferred way using 'with'
+
+  def load_config_with(path: str) -> dict:
+      try:
+          with open(path, 'r') as f:
+              config_data = json.load(f)
+          # ... (validation and logging as above) ...
+          return config_data
+      except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
+          # Handle multiple specific exceptions
+          logger.error(f"Error loading config {path}: {e}", exc_info=True)
+          raise ConfigError(f"Failed to load configuration from {path}") from e
+      # ... (handle ConfigError, general Exception as above) ...
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  import json
+
+  # Invalid: Catching broad Exception first, potentially masking specific errors
+  def bad_load_config_order(path):
+      try:
+          with open(path, 'r') as f:
+              return json.load(f)
+      except Exception as e: # Too broad, catches FileNotFoundError, JSONDecodeError etc.
+          print(f"Something went wrong: {e}") # Poor error reporting
+          return None # Returning None can hide errors
+      except FileNotFoundError: # This will never be reached
+          print("File not found!")
+          return None
+
+  # Invalid: Bare except (swallows all errors, including SystemExit, KeyboardInterrupt)
+  def bad_process_data(data):
+      try:
+          result = 100 / data
+          return result
+      except: # Extremely dangerous - hides the error type and details
+          print("An error occurred during processing.")
+          return 0 # Returning default on any error is often bad
+
+  # Invalid: Using exceptions for control flow
+  def get_value(data: dict, key: str, default=None):
+      try:
+          return data[key]
+      except KeyError: # Using exception for expected condition (key missing)
+          return default # Better: use data.get(key, default)
+
+  # Invalid: Not cleaning up resources without 'with' or 'finally'
+  def bad_file_handling(path):
+      f = open(path, 'w')
+      if some_condition(): # If an exception happens here, file is never closed
+          raise RuntimeError("Condition failed!")
+      f.write("data")
+      f.close() # Might not be reached if error occurs before this
+  ```
+
+</example>

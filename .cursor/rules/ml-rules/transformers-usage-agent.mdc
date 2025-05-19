@@ -1,0 +1,141 @@
+---
+description: "This rule provides guidelines for using the Hugging Face `transformers` library effectively for NLP tasks. Apply when loading models/tokenizers, fine-tuning, using pipelines, or managing model configurations to ensure consistency, efficiency, and best practices."
+globs: ""
+alwaysApply: false
+---
+
+# Hugging Face Transformers Usage Best Practices
+
+## Critical Rules
+
+- **Use `AutoModel` and `AutoTokenizer`:** Prefer using `AutoModelFor[Task]` (e.g., `AutoModelForSequenceClassification`) and `AutoTokenizer` to load models and tokenizers based on model identifiers (e.g., "bert-base-uncased"). This handles loading the correct architecture automatically.
+- **Load Models/Tokenizers Once:** Avoid reloading models or tokenizers repeatedly within loops or functions. Load them once and reuse the objects.
+- **Device Placement:** Explicitly move models and input tensors to the appropriate device (`cpu` or `cuda`) using `.to(device)`. Determine the device dynamically (e.g., `device = torch.device("cuda" if torch.cuda.is_available() else "cpu")`).
+- **Use Pipelines for Inference:** For standard inference tasks (sentiment analysis, text generation, NER, etc.), prefer using the `pipeline()` function for simplicity and optimized defaults.
+- **Tokenizer Settings:** Be mindful of tokenizer settings like `padding`, `truncation`, `max_length`, and `return_tensors` (e.g., "pt" for PyTorch, "tf" for TensorFlow). Set them appropriately for the task and model.
+- **Batch Processing:** For inference on multiple examples, tokenize and process inputs in batches rather than one by one for significantly better performance, especially on GPU.
+- **Model Saving/Loading:** Use `save_pretrained()` and `from_pretrained()` methods to save and load fine-tuned models and tokenizers correctly.
+- **Gradient Handling during Inference:** Ensure operations during inference are wrapped in `torch.no_grad()` (PyTorch) or equivalent context managers to disable gradient calculation, saving memory and computation.
+- **Configuration Objects:** Use `AutoConfig` to inspect model configurations or customize them before loading a model.
+- **Error Handling:** Handle potential errors during model loading (e.g., network issues, invalid identifiers) gracefully.
+- **Resource Management:** Be mindful of GPU memory usage. Use smaller batch sizes or techniques like gradient accumulation if memory is limited during training.
+
+## Examples
+
+<example>
+  ```python
+  import torch
+  from transformers import (
+      AutoModelForSequenceClassification,
+      AutoTokenizer,
+      AutoConfig,
+      pipeline
+  )
+
+# Determine device
+
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+
+# --- Good Practice: Using Auto classes and loading once ---
+
+  try:
+      tokenizer = AutoTokenizer.from_pretrained(model_name)
+      model = AutoModelForSequenceClassification.from_pretrained(model_name)
+      model.to(device) # Move model to device
+      model.eval() # Set model to evaluation mode for inference
+  except OSError as e:
+      print(f"Error loading model/tokenizer: {e}")
+      # Handle error appropriately
+      exit()
+
+# --- Good Practice: Batch Inference with torch.no_grad() ---
+
+  texts = ["This is great!", "This is terrible.", "The weather is okay."]
+  
+# Tokenize batch
+
+  inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt", max_length=512)
+  
+# Move inputs to device
+
+  inputs = {k: v.to(device) for k, v in inputs.items()}
+
+# Inference without gradient calculation
+
+  with torch.no_grad():
+      outputs = model(**inputs)
+      logits = outputs.logits
+      predictions = torch.argmax(logits, dim=-1)
+      # Convert predictions to labels if needed using model.config.id2label
+
+  print(f"Batch Predictions (Indices): {predictions.cpu().numpy()}")
+
+# --- Good Practice: Using Pipelines for standard tasks ---
+
+  try:
+      classifier = pipeline("sentiment-analysis", model=model_name, tokenizer=model_name, device=device)
+      results = classifier(texts)
+      print(f"Pipeline Results: {results}")
+  except Exception as e:
+      print(f"Error creating/using pipeline: {e}")
+
+# --- Good Practice: Saving a fine-tuned model ---
+
+# Assume model was fine-tuned
+
+# output_dir = "./my_finetuned_model"
+
+# model.save_pretrained(output_dir)
+
+# tokenizer.save_pretrained(output_dir)
+
+# --- Good Practice: Inspecting Config ---
+
+# config = AutoConfig.from_pretrained(model_name)
+
+# print(f"Model hidden size: {config.hidden_size}")
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  import torch
+  from transformers import BertForSequenceClassification, BertTokenizer # Using specific classes
+
+  model_name = "bert-base-uncased"
+  texts = ["Example text 1", "Example text 2"]
+  device = "cuda" if torch.cuda.is_available() else "cpu"
+
+  # Invalid: Loading model/tokenizer inside a loop/function (inefficient)
+  # def predict(text):
+  #     tokenizer = BertTokenizer.from_pretrained(model_name) # Reloads every call
+  #     model = BertForSequenceClassification.from_pretrained(model_name) # Reloads every call
+  #     # ... inference ...
+
+  # Invalid: Processing one by one instead of batching
+  # predictions = []
+  # for text in texts:
+  #     tokenizer = BertTokenizer.from_pretrained(model_name) # Reloading
+  #     model = BertForSequenceClassification.from_pretrained(model_name) # Reloading
+  #     inputs = tokenizer(text, return_tensors="pt")
+  #     # Invalid: Not moving model/inputs to device explicitly (may default to CPU)
+  #     outputs = model(**inputs) 
+  #     # Invalid: No torch.no_grad()
+  #     pred = torch.argmax(outputs.logits, dim=-1)
+  #     predictions.append(pred.item())
+
+  # Invalid: Not specifying return_tensors or padding/truncation (may lead to errors/warnings)
+  # tokenizer = BertTokenizer.from_pretrained(model_name)
+  # inputs = tokenizer(texts) # Defaults might not be what's needed
+
+  # Invalid: Forgetting model.eval() during inference (affects dropout/batchnorm layers)
+  # model = BertForSequenceClassification.from_pretrained(model_name).to(device)
+  # # model.train() # Model is in training mode by default
+  # with torch.no_grad():
+  #    # Inference happens here, but dropout is active
+  #    pass
+  ```
+
+</example>

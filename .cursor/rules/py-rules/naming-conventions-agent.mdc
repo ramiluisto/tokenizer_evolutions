@@ -1,0 +1,114 @@
+---
+description: "This rule defines standard naming conventions for variables, functions, classes, modules, and packages in Python, primarily following PEP 8. Apply when writing or refactoring Python code to ensure consistency and readability across the codebase."
+globs: ""
+alwaysApply: false
+---
+
+# Python Naming Conventions (PEP 8)
+
+## Critical Rules
+
+- **Modules/Packages:** Use short, all-lowercase names. Underscores (`_`) can be used if it improves readability (e.g., `my_module`, `package_name`).
+- **Classes:** Use `CapWords` (CamelCase starting with an uppercase letter, e.g., `MyClass`, `DataProcessor`).
+- **Type Variables:** Use `CapWords`, prefer short names (e.g., `T`, `KT`, `VT`, `AnyStr`).
+- **Exceptions:** Use `CapWords` and end with `Error` (e.g., `MyCustomError`, `ValidationError`).
+- **Functions/Methods:** Use `lowercase_with_underscores` (snake_case, e.g., `calculate_sum`, `process_data`).
+- **Function/Method Arguments:** Use `lowercase_with_underscores` (snake_case).
+  - Use `self` for the first argument to instance methods.
+  - Use `cls` for the first argument to class methods.
+- **Variables (instance, local):** Use `lowercase_with_underscores` (snake_case, e.g., `user_name`, `total_count`).
+- **Constants:** Use `ALL_CAPS_WITH_UNDERSCORES` (e.g., `MAX_CONNECTIONS`, `PI`).
+- **Internal Use (Modules/Classes/Functions):** Prefix with a single underscore (`_internal_variable`, `_helper_function`). This indicates non-public parts of an API (though not strictly enforced by Python).
+- **Name Mangling (avoiding conflicts in subclasses):** Prefix with double underscores (`__private_attribute`). Python renames these internally.
+- **Avoid Single-Letter Names:** Except for simple loop counters (`i`, `j`, `k`) or well-established conventions (e.g., `e` for exception, `f` for file handle in short blocks). Prefer descriptive names.
+- **Avoid Using Built-in Names:** Do not use names like `list`, `dict`, `str`, `id`, `type` as variable or function names.
+
+## Examples
+
+<example>
+  ```python
+  # Module: my_data_processor.py
+
+  MAX_RETRIES = 3 # Constant
+  _DEFAULT_TIMEOUT = 10 # Internal constant
+
+  class DataValidationError(ValueError):
+      """Custom exception for data validation errors."""
+      pass
+
+  class DataProcessor: # Class name
+      """Processes data according to specified rules."""
+
+      def __init__(self, api_key: str):
+          self.api_key = api_key # Instance variable
+          self._session_id = self._generate_session() # Internal variable/method
+          self.__internal_state = {} # Name mangling (use sparingly)
+
+      def _generate_session(self) -> str: # Internal method
+          """Generates a unique session ID."""
+          # ... implementation ...
+          return "unique_id_123"
+
+      def process_batch(self, data_batch: list) -> dict: # Method name, argument names
+          """Processes a batch of data."""
+          processed_results = {} # Local variable
+          for item in data_batch:
+              # ... processing ...
+              pass
+          if not processed_results:
+              raise DataValidationError("Processing yielded no results")
+          return processed_results
+
+      @classmethod
+      def from_config(cls, config_path: str) -> 'DataProcessor': # Class method argument
+          """Creates an instance from a configuration file."""
+          # ... read config ...
+          key = "example_key"
+          return cls(key)
+
+  def fetch_user_data(user_id: int) -> dict: # Function name, argument name
+      """Fetches user data from an external source."""
+      # ... implementation ...
+      return {"name": "Alice"}
+
+# Usage
+
+# processor = DataProcessor(api_key="secret")
+
+# results = processor.process_batch([1, 2, 3])
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  # Module: MyDataProcessor.py (Incorrect: should be lowercase)
+
+  maxretries = 3 # Incorrect: Constant should be ALL_CAPS
+
+  # Incorrect: Exception should be CapWords, end with Error
+  class data_validation_exception(Exception):
+      pass
+
+  # Incorrect: Class should be CapWords
+  class data_processor:
+      def __init__(self, APIKey): # Incorrect: argument should be snake_case
+          self.APIKey = APIKey # Incorrect: instance var should be snake_case
+
+      # Incorrect: method should be snake_case
+      def ProcessBatch(self, DataBatch): # Incorrect: arguments snake_case
+          # Incorrect: local variable should be snake_case
+          ProcessedResults = {}
+          for I in DataBatch: # Incorrect: single letter 'I' ok, but 'item' better
+              pass
+          return ProcessedResults
+
+  # Incorrect: function should be snake_case
+  def FetchUserData(UserID): # Incorrect: argument snake_case
+      return {}
+
+  # Incorrect: Using built-in name
+  list = [1, 2, 3]
+  ```
+
+</example>
