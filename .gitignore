@@ -28,6 +28,7 @@ var/
 combined_data/
 models/
 data/
+tokenizers/
 
 # Virtual Environment
 venv/
