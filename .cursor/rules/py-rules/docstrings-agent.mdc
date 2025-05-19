@@ -1,0 +1,99 @@
+---
+description: "This rule defines the standards for writing docstrings in Python code, primarily following Google Style Guide. Apply when writing or reviewing Python functions, classes, modules, and methods to ensure clear, consistent, and useful documentation embedded within the code."
+globs: ""
+alwaysApply: false
+---
+
+# Python Docstring Standards (Google Style)
+
+## Critical Rules
+
+- All public modules, functions, classes, and methods MUST have docstrings.
+- Use triple double quotes (`"""`) for docstrings.
+- The first line should be a short, concise summary of the object's purpose, ending with a period. It should fit on one line.
+- If more explanation is needed, separate the summary line from the rest of the docstring by a blank line.
+- Follow the Google Python Style Guide for formatting sections like `Args:`, `Returns:`, `Yields:`, `Raises:`, `Attributes:`, etc.
+- Document each parameter under the `Args:` section with its name, type (optional but recommended), and description.
+- Document the return value under the `Returns:` section with its type (optional but recommended) and description.
+- Document any exceptions raised under the `Raises:` section with the exception type and conditions under which it's raised.
+- For classes, document attributes under the `Attributes:` section in the class docstring or immediately below the attribute definition.
+- Keep docstrings updated with code changes.
+
+## Examples
+
+<example>
+  ```python
+  import math
+
+  def calculate_distance(point1: tuple[float, float],
+                       point2: tuple[float, float]) -> float:
+      """Calculates the Euclidean distance between two points in a 2D plane.
+
+      Args:
+          point1: A tuple representing the (x, y) coordinates of the first point.
+          point2: A tuple representing the (x, y) coordinates of the second point.
+
+      Returns:
+          The Euclidean distance between the two points.
+
+      Raises:
+          TypeError: If inputs are not tuples or contain non-numeric values.
+          ValueError: If tuples do not contain exactly two elements.
+      """
+      if not isinstance(point1, tuple) or not isinstance(point2, tuple):
+          raise TypeError("Inputs must be tuples.")
+      if len(point1) != 2 or len(point2) != 2:
+          raise ValueError("Points must be 2D coordinates (x, y).")
+
+      try:
+          x1, y1 = point1
+          x2, y2 = point2
+          distance = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+          return distance
+      except TypeError:
+          raise TypeError("Coordinates must be numeric.")
+
+  class Point:
+      """Represents a point in a 2D Cartesian coordinate system.
+
+      Attributes:
+          x: The x-coordinate of the point.
+          y: The y-coordinate of the point.
+      """
+      def __init__(self, x: float, y: float):
+          """Initializes a Point object.
+
+          Args:
+              x: The initial x-coordinate.
+              y: The initial y-coordinate.
+          """
+          self.x = x
+          self.y = y
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  # Missing docstring
+  def my_function(a, b):
+      return a + b
+
+  class BadDocstring:
+      # Incorrect docstring format (single quotes, no summary line)
+      '''
+      This class does something.
+      x is an attribute.
+      '''
+      def __init__(self, x):
+          self.x = x
+
+      # Incomplete docstring (missing Args, Returns, summary not concise)
+      def process(self, data):
+          """This function takes some data and processes it, it might return something or raise an error if the data is bad"""
+          if not data:
+              raise ValueError("Data cannot be empty")
+          return str(data)
+  ```
+
+</example>

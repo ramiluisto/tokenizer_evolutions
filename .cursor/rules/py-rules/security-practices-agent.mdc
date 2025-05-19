@@ -1,0 +1,153 @@
+---
+description: "This rule covers fundamental security practices for writing Python code. Apply when dealing with user input, external data, authentication, dependencies, file handling, or any area where security vulnerabilities might arise, to minimize risks."
+globs: ""
+alwaysApply: false
+---
+
+# Python Security Practices
+
+## Critical Rules
+
+- **Input Validation:** ALWAYS validate and sanitize input from ALL external sources (user input, API responses, file contents, environment variables, database results). Do not trust external data.
+  - Use allow-lists (whitelisting) for validation where possible, rather than block-lists (blacklisting).
+  - Check types, lengths, formats, and ranges.
+- **Injection Prevention:** Protect against injection attacks (SQL injection, Command injection, Cross-Site Scripting - XSS):
+  - **SQL:** Use parameterized queries or Object-Relational Mappers (ORMs) instead of string formatting to build SQL queries.
+  - **Command:** Avoid using `os.system`, `subprocess.call(shell=True)`, etc., with unvalidated input. Use list-based arguments for `subprocess` calls where possible.
+  - **XSS (Web):** Use templating engines (like Jinja2) that auto-escape output. Explicitly sanitize any user-provided HTML.
+- **Dependency Management:** Keep dependencies updated (`uv pip list --outdated`). Use tools like `pip-audit` or GitHub Dependabot to scan for known vulnerabilities. Pin dependency versions (`requirements.lock.txt` or `pyproject.toml` lock file) for reproducible and auditable builds.
+- **Secrets Management:** NEVER hardcode secrets (API keys, passwords, certificates) directly in source code. Use environment variables, dedicated secrets management tools (like HashiCorp Vault, AWS Secrets Manager), or configuration files with restricted permissions.
+- **Secure File Handling:** Be cautious when handling file paths provided by users. Validate paths to prevent directory traversal attacks (`../`). Set appropriate file permissions when creating files.
+- **Authentication & Authorization:** Implement robust authentication and authorization mechanisms. Use standard, well-vetted libraries for password hashing (e.g., `passlib`, `bcrypt`) and session management.
+- **HTTPS Enforcement:** Use HTTPS for all web communication. Disable older, insecure protocols like SSLv2/v3 and early TLS versions.
+- **Serialization Security:** Be extremely cautious when deserializing data from untrusted sources, especially using `pickle`, which can execute arbitrary code. Prefer safer formats like JSON if possible, or use libraries designed for safe deserialization.
+- **Limit Debug Information:** Do not expose detailed error messages, stack traces, or debug information in production environments.
+- **Regular Audits/Reviews:** Regularly review code for security vulnerabilities, ideally incorporating security into the development lifecycle (DevSecOps).
+
+## Examples
+
+<example>
+  ```python
+  import os
+  import subprocess
+  import sqlite3
+  from markupsafe import escape # For web frameworks like Flask/Jinja2
+  import logging
+  import bcrypt
+  import json
+
+  logger = logging.getLogger(**name**)
+
+# Input Validation (Basic Example)
+
+  def get_user_id(request_data: dict) -> int:
+      user_id_str = request_data.get('user_id')
+      if not user_id_str or not user_id_str.isdigit():
+          raise ValueError("Invalid or missing user_id")
+      return int(user_id_str)
+
+# SQL Injection Prevention (Parameterized Query)
+
+  def get_user_email(db_conn: sqlite3.Connection, user_id: int) -> str | None:
+      cursor = db_conn.cursor()
+      # Use placeholder (?) for user input
+      cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+      result = cursor.fetchone()
+      return result[0] if result else None
+
+# Command Injection Prevention (Avoid shell=True)
+
+  def list_directory_safe(target_dir: str):
+      # Assume target_dir is validated elsewhere to prevent traversal
+      try:
+          # Use list of arguments, not shell=True
+          result = subprocess.run(["ls", "-l", target_dir], capture_output=True, text=True, check=True)
+          print(result.stdout)
+      except subprocess.CalledProcessError as e:
+          logger.error(f"Error listing directory '{target_dir}': {e}")
+      except FileNotFoundError:
+          logger.error(f"'ls' command not found.")
+
+# Secrets Management (Environment Variables)
+
+  api_key = os.environ.get("MY_API_KEY")
+  if not api_key:
+      raise ValueError("MY_API_KEY environment variable not set.")
+
+# Password Hashing
+
+  def hash_password(password: str) -> bytes:
+      salt = bcrypt.gensalt()
+      hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+      return hashed
+
+# Safe Deserialization (JSON instead of pickle)
+
+  def load_data_safe(json_string: str) -> dict:
+      try:
+          return json.loads(json_string)
+      except json.JSONDecodeError:
+          raise ValueError("Invalid JSON data")
+
+# XSS Prevention (using escape in a web context, e.g., Flask/Jinja2)
+
+# In Flask template: {{ user_comment | e }} or rely on autoescape
+
+# Python-side example (less common outside web framework context)
+
+  def display_comment(comment: str) -> str:
+      safe_comment = escape(comment)
+      return f"<div>{safe_comment}</div>"
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  import os
+  import subprocess
+  import sqlite3
+  import pickle
+
+  # Input Validation (Missing/Insufficient)
+  def process_input(user_input):
+      # No validation - user_input could be anything
+      print(f"Processing: {user_input}")
+
+  # SQL Injection Vulnerability (String Formatting)
+  def get_user_data_unsafe(db_conn: sqlite3.Connection, user_name: str):
+      cursor = db_conn.cursor()
+      # Vulnerable: User input directly inserted into query
+      query = f"SELECT * FROM users WHERE username = '{user_name}'" # DANGER!
+      cursor.execute(query)
+      return cursor.fetchall()
+
+  # Command Injection Vulnerability (shell=True)
+  def run_command_unsafe(command_input: str):
+      # Vulnerable: Unvalidated input used with shell=True
+      subprocess.call(f"echo {command_input}", shell=True) # DANGER!
+
+  # Hardcoded Secrets
+  API_SECRET = "mySuperSecretPassword123" # DANGER! Hardcoded in code.
+  db_password = "admin123"
+
+  # Directory Traversal
+  def read_file_unsafe(base_path: str, filename: str):
+      # Vulnerable: filename could be "../sensitive_file"
+      full_path = os.path.join(base_path, filename) # Needs sanitization/check
+      with open(full_path, 'r') as f:
+          return f.read()
+
+  # Insecure Deserialization (Pickle)
+  def load_object_unsafe(pickled_data: bytes):
+      # Vulnerable: Deserializing pickle from untrusted source can execute code
+      return pickle.loads(pickled_data) # DANGER!
+
+  # Exposing Debug Information (e.g., in a web app)
+  # try:
+  #    # ... operation ...
+  # except Exception as e:
+  #    return f"<h1>Error: {e}</h1><pre>{traceback.format_exc()}</pre>" # DANGER in production!
+  ```
+
+</example>

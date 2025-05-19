@@ -1,0 +1,107 @@
+---
+description: "This rule provides guidelines for effective and efficient use of the Pandas library for data manipulation and analysis in Python. Apply when writing or reviewing code involving Pandas DataFrames or Series to promote readability, performance, and best practices."
+globs: ""
+alwaysApply: false
+---
+
+# Pandas Usage Best Practices
+
+## Critical Rules
+
+- **Vectorization:** Prefer vectorized operations (using Pandas functions/methods directly on Series/DataFrames) over explicit iteration (e.g., `for` loops, `iterrows`, `itertuples`). Vectorization is significantly faster.
+- **Avoid `iterrows`/`itertuples` for Modification:** Do NOT modify DataFrames while iterating with `iterrows` or `itertuples`. Use vectorized assignments, `.loc`/`.iloc` with boolean indexing, or `.apply()` instead.
+- **Use `.loc` and `.iloc`:** Use `.loc[]` for label-based indexing and `.iloc[]` for position-based indexing. Avoid chained indexing (e.g., `df[col][row]`) as it can lead to `SettingWithCopyWarning` and unpredictable behavior. Use `df.loc[row, col]` instead.
+- **Memory Efficiency:**
+  - Load only necessary columns using the `usecols` parameter in read functions (e.g., `pd.read_csv`).
+  - Downcast numeric types (e.g., `float64` to `float32`, `int64` to `int32`/`int16`/`int8`) where appropriate using `pd.to_numeric` or `astype`.
+  - Use categorical types (`astype('category')`) for string columns with low cardinality (few unique values).
+- **Method Chaining:** Use method chaining (`df.method1().method2().method3()`) for sequences of operations to improve readability, but break long chains onto multiple lines using parentheses `()` for clarity.
+- **Handle Missing Data Explicitly:** Use methods like `.isnull()`, `.notnull()`, `.fillna()`, `.dropna()` to consciously handle missing values (`NaN`). Do not rely on default behavior implicitly.
+- **Use Appropriate Data Structures:** Use Series for 1D data and DataFrames for 2D tabular data. Don't overuse DataFrames for simple lists or dictionaries.
+- **Prefer `.apply()` Sparingly:** Use `.apply()` for complex, row-wise or column-wise operations that cannot be easily vectorized. Be aware that `.apply()` can be slow, essentially acting like a loop.
+- **Copy vs. View:** Understand the difference between views and copies. Use `.copy()` explicitly when you need to modify a slice without affecting the original DataFrame.
+
+## Examples
+
+<example>
+  ```python
+  import pandas as pd
+  import numpy as np
+
+# Creating sample data
+
+  data = {
+      'Category': ['A', 'B', 'A', 'C', 'B', 'A', None, 'C'],
+      'Value1': [10, 20, 30, 40, 50, 60, 70, 80],
+      'Value2': [1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8]
+  }
+  df = pd.DataFrame(data)
+
+# Memory Efficiency: Downcasting and Categorical
+
+  df['Value1'] = pd.to_numeric(df['Value1'], downcast='integer') # Downcast to int8/16/32
+  df['Value2'] = pd.to_numeric(df['Value2'], downcast='float') # Downcast to float32
+  df['Category'] = df['Category'].astype('category') # Use category type
+
+# Vectorized Operation (Good)
+
+  df['Value1_plus_100'] = df['Value1'] + 100
+
+# Boolean Indexing with .loc (Good)
+
+  df.loc[df['Value1'] > 40, 'HighValue'] = True
+  df['HighValue'] = df['HighValue'].fillna(False) # Explicit NaN handling
+
+# Using .loc for selection (Good)
+
+  subset = df.loc[df['Category'] == 'A', ['Value1', 'Value2']].copy() # Explicit copy
+
+# Method Chaining (Readable)
+
+  processed_df = (
+      df.dropna(subset=['Category'])
+        .assign(Value3 = lambda x: x['Value1'] * x['Value2'])
+        .query('Value3 > 100')
+        .sort_values(by='Value3', ascending=False)
+  )
+
+# Using apply for a complex function (Use when necessary)
+
+  def custom_logic(row):
+      if row['Category'] == 'A':
+          return row['Value1'] * 2
+      else:
+          return row['Value2']
+
+  df['CustomValue'] = df.apply(custom_logic, axis=1)
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  import pandas as pd
+
+  data = {'A': [1, 2, 3], 'B': [4, 5, 6]}
+  df = pd.DataFrame(data)
+
+  # Iteration for calculation (Bad - Slow)
+  df['C'] = 0
+  for index, row in df.iterrows():
+      df.loc[index, 'C'] = row['A'] + row['B'] # Avoid modifying during iteration
+
+  # Chained Indexing (Bad - Potentially raises SettingWithCopyWarning)
+  df['A'][df['A'] > 1] = 100 # Use df.loc[df['A'] > 1, 'A'] = 100 instead
+
+  # Implicit NaN Handling (Can lead to unexpected results)
+  # Assuming some operations might introduce NaNs
+  mean_value = df['some_col_with_nans'].mean() # Mean calculated ignoring NaNs implicitly
+
+  # Not using categorical for low cardinality string column
+  df['Status'] = ['Active', 'Inactive', 'Active'] * 1000 # Should be category type
+
+  # Overusing apply for simple operations
+  df['B_plus_1'] = df.apply(lambda row: row['B'] + 1, axis=1) # Bad: Use df['B'] + 1
+  ```
+
+</example>

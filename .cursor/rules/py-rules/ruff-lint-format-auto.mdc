@@ -1,0 +1,74 @@
+---
+description: ""
+globs: *.py
+alwaysApply: false
+---
+
+# Ruff Linting, Formatting, and Import Sorting
+
+## Critical Rules
+
+- Use `Ruff` for linting, formatting, and import sorting.
+- Configure Ruff via a `ruff.toml` or `pyproject.toml` file in the project root.
+- Run `ruff check --fix .` and `ruff format .` frequently, ideally before commits.
+- Adhere to the configured line length limit (e.g., 88 or 100 characters).
+- Follow Ruff's default import sorting order (standard library, third-party, first-party/local).
+- Address or explicitly ignore (`# noqa: RULE_CODE`) all linting errors reported by Ruff.
+- Do not disable essential rules without strong justification.
+
+## Examples
+
+<example>
+  ```python
+  # Code formatted and linted by Ruff
+  import os
+  import sys
+  
+  import pandas as pd  # Third-party
+  
+  from my_package import utils  # First-party/local
+  
+  def process_data(file_path: str) -> pd.DataFrame:
+      """Loads and processes data from a file."""
+      if not os.path.exists(file_path):
+          print(f"Error: File not found at {file_path}", file=sys.stderr)
+          raise FileNotFoundError(f"No such file: '{file_path}'")
+
+      # Example of adhering to line length and formatting
+      data = pd.read_csv(file_path)
+      processed_data = utils.perform_complex_processing(
+          data, parameter1="value1", parameter2="value2"
+      )
+      return processed_data
+  
+# Example usage suppressed for brevity
+
+# if __name__ == "__main__"
+
+# df = process_data("data.csv")
+
+# print(df.head())
+  
+  ```
+  *Assuming a `ruff.toml` or `pyproject.toml` exists configuring Ruff.*
+</example>
+
+<example type="invalid">
+  ```python
+  # Code NOT formatted or linted by Ruff
+  import pandas as pd # Third-party before standard library
+  import os, sys # Multiple imports on one line
+  from my_package import utils # Incorrect spacing/grouping
+  
+  # Function definition formatting issues
+def process_data(file_path: str) -> pd.DataFrame:
+    print("Processing...") # Inconsistent indentation
+    # Very long line that exceeds typical limits without breaking, making it hard to read.
+    result = utils.perform_some_extremely_long_and_complex_processing_function_with_many_arguments(pd.read_csv(file_path), param1='value1', param2='value2', param3='value3', param4='value4')
+    
+    unused_variable = 1 # Ruff would flag this
+    
+    return result # Inconsistent return spacing
+  ```
+
+</example>

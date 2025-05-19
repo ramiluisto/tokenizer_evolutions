@@ -1,0 +1,117 @@
+---
+description: "This rule provides guidelines for using the Polars library for high-performance data manipulation in Python, emphasizing its expression-based API and parallel execution capabilities. Apply when working with Polars DataFrames or LazyFrames to write idiomatic, efficient, and scalable data processing code."
+globs: ""
+alwaysApply: false
+---
+
+# Polars Usage Best Practices
+
+## Critical Rules
+
+- **Use Expressions:** Embrace the Polars expression API (`pl.col()`, `pl.lit()`, etc.) within methods like `select`, `with_columns`, `filter`, `group_by`, etc. This is the core of Polars and enables optimization and parallelism.
+- **Lazy Evaluation:** Prefer LazyFrames (`scan_csv`, `lazy()`) for operations on large datasets or complex queries. This allows Polars to optimize the entire query plan before execution (`collect()`). Use eager execution (`pl.DataFrame`) for smaller datasets or interactive exploration where immediate results are needed.
+- **Method Chaining:** Chain operations together using the expression API. Polars optimizes chained expressions effectively.
+- **Avoid Python UDFs When Possible:** User-Defined Functions (UDFs) written in Python (`apply`, `map_elements`) break out of the optimized Rust core and can be significantly slower. Use built-in Polars expressions whenever possible. If a UDF is necessary, consider using the Rust API via `pyo3-polars` or libraries like Numba for performance.
+- **Select Columns Explicitly:** In `select` and `with_columns`, explicitly list the columns you need. Avoid selecting all (`*`) unless necessary, especially in LazyFrames.
+- **Data Types:** Be mindful of data types. Use appropriate types (e.g., `pl.Categorical` for low-cardinality strings, `pl.Int*`, `pl.Float*`) for memory efficiency and performance. Use `cast()` for explicit type conversions.
+- **Prefer Built-in Aggregations:** Use Polars' built-in aggregation functions within `group_by(...).agg(...)` (e.g., `sum`, `mean`, `count`, `list`, `first`, `last`) as they are highly optimized.
+- **Contexts (`pl.when().then().otherwise()`):** Use Polars' `when-then-otherwise` expressions for conditional logic instead of Python `if/else` within UDFs.
+- **String Processing:** Use the `str` namespace expressions (`pl.col("string_col").str.contains()`, `.str.replace()`, etc.) for optimized string operations.
+- **Window Functions:** Utilize window functions (`over()`) for calculations based on a window of rows (e.g., rolling averages, rankings).
+
+## Examples
+
+<example>
+  ```python
+  import polars as pl
+
+# LazyFrame Example (Preferred for larger data/complex queries)
+
+  q = (
+      pl.scan_csv("data.csv") # Start lazy
+      .filter(pl.col("value") > 10)
+      .with_columns([
+          (pl.col("category").str.to_uppercase()).alias("CATEGORY_UPPER"),
+          pl.when(pl.col("value") > 100)
+          .then(pl.lit("High"))
+          .otherwise(pl.lit("Low"))
+          .alias("value_level")
+      ])
+      .group_by("CATEGORY_UPPER")
+      .agg([
+          pl.mean("value").alias("mean_value"),
+          pl.count().alias("count"),
+          pl.col("value_level").first().alias("first_level") # Example aggregation
+      ])
+      .sort("count", descending=True)
+  )
+
+# Execute the lazy query
+
+# result_df = q.collect()
+
+# Eager DataFrame Example (Good for smaller data/interactive use)
+
+  df = pl.DataFrame({
+      "id": [1, 2, 3, 4],
+      "group": ["A", "A", "B", "B"],
+      "score": [90.5, 85.0, 95.5, 92.0]
+  })
+
+# Use expressions with eager DataFrame
+
+  df_processed = df.with_columns([
+      (pl.col("score") * 1.1).alias("adjusted_score"),
+      pl.col("score").rank(method='ordinal', descending=True).over("group").alias("rank_in_group") # Window function
+  ])
+
+# Casting types
+
+# df = df.with_columns(pl.col("id").cast(pl.Int16))
+
+# df = df.with_columns(pl.col("group").cast(pl.Categorical))
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  import polars as pl
+
+  df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+
+  # Invalid: Iterating over rows (very slow in Polars)
+  # result = []
+  # for row in df.iter_rows(named=True):
+  #     result.append(row['a'] + row['b'])
+
+  # Invalid: Using Python UDF (apply/map_elements) for simple arithmetic (slow)
+  # def add_cols(row): # Assume row is a tuple or dict depending on apply variant
+  #    return row[0] + row[1] # Or row['a'] + row['b']
+  # df = df.with_columns(pl.struct(["a", "b"]).apply(lambda x: x["a"] + x["b"]).alias("c")) # Much slower than pl.col('a') + pl.col('b')
+  # df = df.with_columns(df.map_rows(lambda row: row[0] + row[1]).alias("c")) # map_rows is also slow
+
+  # Invalid: Not using LazyFrames for potentially large file
+  # df_large = pl.read_csv("large_file.csv") # Loads entire file into memory immediately
+  # # ... followed by multiple operations
+
+  # Invalid: Using Python conditional logic instead of pl.when/then
+  # def conditional_udf(value):
+  #     if value > 10:
+  #         return "High"
+  #     else:
+  #         return "Low"
+  # df = df.with_columns(pl.col('a').apply(conditional_udf).alias("level")) # Slow
+
+  # Invalid: Materializing intermediate results unnecessarily in a lazy chain
+  # q_bad = (
+  #     pl.scan_csv("data.csv")
+  #     .filter(pl.col("value") > 10)
+  #     .collect() # Materializes here - breaks optimization
+  #     .lazy() # Restarts lazy context, but optimization potential lost
+  #     .with_columns(...)
+  #     .collect()
+  # )
+  ```
+
+</example>

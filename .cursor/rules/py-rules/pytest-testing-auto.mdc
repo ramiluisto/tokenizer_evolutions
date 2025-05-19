@@ -1,0 +1,83 @@
+---
+description: ""
+globs: test_*.py, *_test.py
+alwaysApply: false
+---
+
+# Pytest Testing Standards
+
+## Critical Rules
+
+- Use `pytest` as the testing framework for all Python projects.
+- Test files MUST be named `test_*.py` or `*_test.py`.
+- Test functions MUST be named `test_*`. Test classes MUST be named `Test*`.
+- Place test files in a dedicated `tests/` directory at the project root.
+- Use fixtures (`@pytest.fixture`) for setting up test preconditions and sharing resources. Prefer fixtures over `setup`/`teardown` methods.
+- Use descriptive names for test functions and fixtures that clearly state their purpose or the condition being tested.
+- Use specific `pytest` assertion functions (`pytest.raises`, `pytest.mark.parametrize`, etc.) where appropriate instead of plain `assert`.
+- Keep tests focused and independent. Each test should ideally verify one specific behavior or condition.
+- Group related tests within classes or modules.
+- Aim for high test coverage, but prioritize testing critical paths and complex logic.
+
+## Examples
+
+<example>
+  ```python
+  # tests/test_calculator.py
+  import pytest
+  from my_package.calculator import add
+
+  @pytest.fixture
+  def basic_numbers():
+      """Provides a tuple of two numbers for basic tests."""
+      return (2, 3)
+
+  def test_addition(basic_numbers):
+      """Test the add function with positive integers."""
+      num1, num2 = basic_numbers
+      assert add(num1, num2) == 5
+
+  def test_addition_negative():
+      """Test the add function with negative integers."""
+      assert add(-1, -5) == -6
+
+  @pytest.mark.parametrize("a, b, expected", [
+      (0, 0, 0),
+      (100, 200, 300),
+      (-5, 5, 0)
+  ])
+  def test_addition_parametrized(a, b, expected):
+      """Test add function with various inputs."""
+      assert add(a, b) == expected
+
+  def test_type_error():
+      """Test that add raises TypeError for invalid input types."""
+      with pytest.raises(TypeError):
+          add("a", 1)
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  # test_calculation.py  <-- File name doesn't follow convention
+  import unittest # <-- Should use pytest
+  from my_package.calculator import add
+
+  # No clear structure or use of fixtures
+
+  def check_addition(): # <-- Function name doesn't follow convention
+      # Using plain assert for exception checking
+      try:
+          add("a", 1)
+          assert False # Should have raised TypeError
+      except TypeError:
+          assert True
+      
+      # Test multiple things in one function
+      assert add(1, 1) == 2
+      assert add(-1, -1) == -2
+      assert add(0, 0) == 0 
+  ```
+
+</example>

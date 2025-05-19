@@ -1,0 +1,98 @@
+---
+description: "This rule outlines best practices for logging in Python applications using the standard `logging` module. Apply this rule when adding or modifying logging statements, configuring loggers, or discussing logging strategies to ensure consistent, informative, and manageable logs."
+globs: ""
+alwaysApply: false
+---
+
+# Python Logging Best Practices
+
+## Critical Rules
+
+- Use the standard `logging` module for all application logging. Avoid using `print()` statements for logging purposes.
+- Configure logging early in the application setup, preferably using a configuration file (`logging.conf`, YAML, JSON) or dictionary (`logging.config.dictConfig`).
+- Obtain logger instances specific to modules: `logger = logging.getLogger(__name__)`. Do not use the root logger directly unless necessary.
+- Use appropriate logging levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) to categorize messages.
+- Include contextual information in log messages (e.g., relevant variables, user IDs, request IDs) to aid debugging.
+- Format log messages consistently using `LogRecord` attributes (e.g., timestamp, level name, logger name, message). Use a `logging.Formatter`.
+- Handle exceptions by logging them with `logger.exception("Error message")`, which includes the traceback information automatically.
+- Avoid logging sensitive information (passwords, API keys, PII) directly. Implement filtering or redaction if necessary.
+- Configure appropriate handlers (e.g., `FileHandler`, `StreamHandler`, `RotatingFileHandler`) based on the application's needs (log to file, console, etc.).
+- Consider using structured logging (e.g., JSON format) for easier parsing and analysis by log management systems.
+
+## Examples
+
+<example>
+  ```python
+  import logging
+  import logging.config
+
+# Basic configuration (can be more sophisticated with dictConfig/fileConfig)
+
+  logging.basicConfig(
+      level=logging.INFO,
+      format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+      handlers=[logging.StreamHandler()] # Log to console
+  )
+
+# Get module-specific logger
+
+  logger = logging.getLogger(__name__)
+
+  def process_user_data(user_id: int, data: dict):
+      """Processes user data, logging relevant information."""
+      logger.info(f"Starting data processing for user_id={user_id}")
+      try:
+          # Simulate processing
+          result = data['value'] * 2
+          logger.debug(f"Intermediate result for user_id={user_id}: {result}") # DEBUG level
+          # ... more processing ...
+          logger.info(f"Successfully processed data for user_id={user_id}")
+          return result
+      except KeyError as e:
+          # Log exception with traceback
+          logger.exception(f"Missing key in data for user_id={user_id}. Error: {e}")
+          raise # Re-raise the exception if needed
+      except Exception as e:
+          logger.error(f"An unexpected error occurred for user_id={user_id}: {e}", exc_info=True) # Alternative way to include traceback
+          raise
+
+# Example usage
+
+# process_user_data(123, {'value': 10})
+
+# process_user_data(456, {'key': 5}) # Will raise KeyError
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  import sys
+
+  # Invalid: Using print for logging
+  print("Starting process...")
+
+  def bad_logging_example(data):
+      # Invalid: Using print for debugging/info
+      print(f"Processing data: {data}")
+      try:
+          result = data / 2
+          # Invalid: Print for success message
+          print("Division successful.")
+      except TypeError:
+          # Invalid: Print for error, no traceback, logs to stdout instead of stderr
+          print("Error: Invalid data type for division.")
+          # Invalid: Losing exception context
+          pass # Silently ignoring or just printing is bad
+
+  # Invalid: Using root logger directly everywhere with basicConfig defaults
+  import logging
+  logging.basicConfig() # Often too basic for applications
+  logging.warning("This uses the root logger directly.")
+
+  # Invalid: Logging sensitive data
+  password = "secret_password"
+  logging.info(f"User logged in with password: {password}")
+  ```
+
+</example>

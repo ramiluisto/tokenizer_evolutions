@@ -1,0 +1,107 @@
+---
+description: "This rule mandates the use of Python type hints (PEP 484) for function signatures and variable annotations. Apply when writing or modifying Python code to improve code clarity, enable static analysis, and enhance maintainability."
+globs: ""
+alwaysApply: false
+---
+
+# Python Type Hinting Standards
+
+## Critical Rules
+
+- Use type hints for all function arguments and return values.
+- Use type hints for variables where the type is not immediately obvious from the assignment.
+- Use the `typing` module for complex types (e.g., `List`, `Dict`, `Tuple`, `Optional`, `Union`, `Callable`, `TypeVar`, `Any`).
+- Use forward references (strings) for types defined later in the file or for self-references within classes, or use `from __future__ import annotations` (Python 3.7+).
+- Use `Optional[X]` for arguments or return values that can be `None` (equivalent to `Union[X, None]`).
+- Use `Union[X, Y]` when a value can be one of several types.
+- Use `Callable[[Arg1Type, Arg2Type], ReturnType]` for functions passed as arguments.
+- Keep type hints accurate and up-to-date with the code.
+- Use `typing.Any` sparingly, only when the type cannot be more specific or is intentionally dynamic.
+- Consider using static type checkers like `Mypy` or `Pyright`/`Pytype` to verify type hints.
+
+## Examples
+
+<example>
+  ```python
+  from typing import List, Dict, Optional, Union, Callable, Tuple, Any
+  # from __future__ import annotations # Alternative to forward references
+
+  class DataProcessor:
+      """Processes various data types."""
+
+      def __init__(self, name: str):
+          self.name: str = name
+          self.cache: Dict[str, Any] = {}
+
+      def process_numbers(self, numbers: List[Union[int, float]]) -> float:
+          """Calculates the sum of a list of numbers."""
+          if not numbers:
+              return 0.0
+          return sum(numbers)
+
+      def find_item(self, item_id: str) -> Optional[Dict[str, Any]]:
+          """Finds an item in the cache."""
+          return self.cache.get(item_id)
+
+      def register_callback(self, event: str, callback: Callable[[str], None]) -> None:
+          """Registers a callback function for an event."""
+          # Implementation omitted
+          print(f"Registered callback for event: {event}")
+          # Example call to the callback
+          # callback(f"Event {event} triggered") 
+
+      # Example using forward reference (string) if DataProcessor is used in type hint
+      def merge_processors(self, other: 'DataProcessor') -> 'DataProcessor':
+          """Merges this processor with another."""
+          # Implementation omitted
+          merged_name = f"{self.name}_{other.name}"
+          return DataProcessor(merged_name)
+
+# Type hinting for a variable
+
+  processed_value: float = 0.0
+
+  def my_callback(message: str) -> None:
+      print(f"Callback received: {message}")
+
+# Usage
+
+# processor = DataProcessor("Main")
+
+# total = processor.process_numbers([1, 2.5, 3])
+
+# processor.register_callback("data_received", my_callback)
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  # No type hints for function signature
+  def add(a, b):
+      return a + b
+
+  # Inconsistent or missing type hints
+  def get_user_data(user_id):
+      # Returns a dictionary or None, but not hinted
+      if user_id == 1:
+          return {"name": "Alice", "age": 30} # Missing hint for Dict[str, Union[str, int]]
+      else:
+          return None # Missing hint for Optional[...]
+
+  # Vague type hint using Any where a specific type is possible
+  from typing import Any
+  user_list: Any = [] # Could be List[str] or List[UserObject] etc.
+
+  # Incorrect type hint usage
+  from typing import List
+  def process_ids(ids: List) -> list: # Use specific types like List[int]
+      # ...
+      return list(ids)
+
+  # Missing type hints for variables
+  result = add(1, 2) # Type of result is not explicitly hinted
+  name = "Bob" # Type is obvious here, hint not strictly needed but allowed
+  ```
+
+</example>

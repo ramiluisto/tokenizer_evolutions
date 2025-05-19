@@ -1,0 +1,166 @@
+---
+description: "This rule outlines best practices for data preprocessing in machine learning workflows, focusing on techniques commonly used with libraries like Scikit-learn, Pandas, and Polars. Apply when cleaning, transforming, scaling, encoding, or selecting features for ML models to ensure data quality, prevent leakage, and improve model performance."
+globs: ""
+alwaysApply: false
+---
+
+# Data Preprocessing for Machine Learning
+
+## Critical Rules
+
+- **Split Data First:** Split data into training, validation, and test sets BEFORE any preprocessing steps that learn parameters from the data (e.g., scaling, imputation with means/medians, PCA). Fit preprocessing steps ONLY on the training data and then transform all sets (train, validation, test).
+- **Handle Missing Values:** Explicitly address missing values (NaNs). Common strategies include:
+  - Imputation: Replace with mean, median, mode (fit on training data only), or use more sophisticated methods like KNNImputer.
+  - Dropping: Remove rows or columns with missing values, but be cautious about data loss.
+  - Model-Based: Some models can handle NaNs directly or use indicator variables.
+- **Feature Scaling:** Scale numerical features, especially for distance-based algorithms (SVM, KNN) or models sensitive to feature magnitudes (linear models with regularization, neural networks). Common scalers:
+  - `StandardScaler`: Zero mean, unit variance (fit on training data).
+  - `MinMaxScaler`: Scales to a fixed range [0, 1] (fit on training data).
+  - `RobustScaler`: Uses median and IQR, less sensitive to outliers (fit on training data).
+- **Categorical Feature Encoding:** Convert categorical features (strings or discrete values) into numerical representations:
+  - `OneHotEncoder`: Creates binary columns for each category. Handles unknown categories during transform (fit on training data).
+  - `OrdinalEncoder`: Encodes categories as integers. Suitable only if there's an inherent order.
+  - Target Encoding / Count Encoding: More advanced methods, be careful about data leakage.
+- **Outlier Handling:** Identify and handle outliers appropriately. Strategies include removal, transformation (e.g., log transform), or using robust models/metrics.
+- **Feature Engineering:** Create new features from existing ones based on domain knowledge or data exploration (e.g., interaction terms, polynomial features, date-based features).
+- **Feature Selection:** Select relevant features to reduce dimensionality, improve model performance, and reduce overfitting. Methods include:
+  - Filter methods (correlation, mutual information).
+  - Wrapper methods (Recursive Feature Elimination - RFE).
+  - Embedded methods (Lasso regularization).
+- **Use Pipelines:** Use Scikit-learn `Pipeline` objects to chain preprocessing steps and the final model estimator. This prevents data leakage during cross-validation and simplifies the workflow.
+- **Consistency:** Ensure the exact same preprocessing steps are applied to training, validation, test data, and any new data used for prediction.
+
+## Examples
+
+<example>
+  ```python
+  import pandas as pd
+  from sklearn.model_selection import train_test_split
+  from sklearn.impute import SimpleImputer
+  from sklearn.preprocessing import StandardScaler, OneHotEncoder
+  from sklearn.compose import ColumnTransformer
+  from sklearn.pipeline import Pipeline
+  from sklearn.linear_model import LogisticRegression
+
+# Sample Data (assume df is loaded)
+
+# df = pd.DataFrame({...})
+
+# X = df.drop('target', axis=1)
+
+# y = df['target']
+
+# Placeholder data for demonstration
+
+  X = pd.DataFrame({
+      'numeric_feat1': [1.0, 2.0, np.nan, 4.0, 5.0] *10,
+      'numeric_feat2': [10.5, 12.1, 11.3, 15.6, 10.9]* 10,
+      'categorical_feat': ['A', 'B', 'A', 'C', 'B'] *10,
+      'ordinal_feat': [1, 2, 1, 3, 2]* 10
+  })
+  y = pd.Series([0, 1, 0, 1, 0] * 10)
+
+# 1. Split Data FIRST
+
+  X_train, X_test, y_train, y_test = train_test_split(
+      X, y, test_size=0.2, random_state=42, stratify=y
+  )
+
+# Identify column types
+
+  numeric_features = ['numeric_feat1', 'numeric_feat2']
+  categorical_features = ['categorical_feat']
+
+# ordinal_features = ['ordinal_feat'] # Assume ordinal features don't need special handling here
+
+# 2. Create Preprocessing Steps (to be fit on X_train ONLY)
+
+  numeric_transformer = Pipeline(steps=[
+      ('imputer', SimpleImputer(strategy='median')), # Fit on X_train
+      ('scaler', StandardScaler()) # Fit on X_train
+  ])
+
+  categorical_transformer = Pipeline(steps=[
+      ('onehot', OneHotEncoder(handle_unknown='ignore')) # Fit on X_train
+  ])
+
+# 3. Combine Preprocessing Steps using ColumnTransformer
+
+  preprocessor = ColumnTransformer(
+      transformers=[
+          ('num', numeric_transformer, numeric_features),
+          ('cat', categorical_transformer, categorical_features)
+      ],
+      remainder='passthrough' # Keep other columns (like ordinal_feat)
+  )
+
+# 4. Create the Full Pipeline with Preprocessor and Model
+
+  model_pipeline = Pipeline(steps=[
+      ('preprocessor', preprocessor),
+      ('classifier', LogisticRegression(solver='liblinear'))
+  ])
+
+# 5. Fit the ENTIRE pipeline on the training data
+
+# Preprocessing steps (imputer, scaler, onehot) are fit ONLY on X_train inside the pipeline
+
+  model_pipeline.fit(X_train, y_train)
+
+# 6. Evaluate on Test Data
+
+# The .score() method automatically applies the fitted preprocessing steps to X_test
+
+  accuracy = model_pipeline.score(X_test, y_test)
+  print(f"Test Accuracy: {accuracy:.4f}")
+
+# 7. Make Predictions on New Data
+
+# new_data = pd.DataFrame({...})
+
+# predictions = model_pipeline.predict(new_data) # Uses fitted preprocessor
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  import pandas as pd
+  import numpy as np
+  from sklearn.preprocessing import StandardScaler
+  from sklearn.model_selection import train_test_split
+  from sklearn.linear_model import LogisticRegression
+
+  # Placeholder data
+  X = pd.DataFrame({'feat1': [1, 2, 3, 4, 500], 'feat2': [10, 20, 30, 40, 50]})
+  y = pd.Series([0, 0, 0, 1, 1])
+
+  # Invalid: Scaling BEFORE splitting (Data Leakage)
+  scaler = StandardScaler() 
+  X_scaled = scaler.fit_transform(X) # Fitting scaler on ALL data (leaks info from test set)
+  X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2)
+  # The scaler learned mean/std from the test data points, which is leakage
+
+  # Invalid: Fitting preprocessor on test data
+  # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+  # scaler_train = StandardScaler().fit(X_train)
+  # X_train_scaled = scaler_train.transform(X_train)
+  # scaler_test = StandardScaler().fit(X_test) # WRONG: Fitting on test data
+  # X_test_scaled = scaler_test.transform(X_test) # Inconsistent scaling
+
+  # Invalid: Not using pipelines for cross-validation (prone to leakage)
+  from sklearn.model_selection import cross_val_score
+  # X_train, X_test, ... = train_test_split(X, y, ...)
+  # scaler = StandardScaler().fit(X_train) # Fit scaler only once
+  # X_train_scaled = scaler.transform(X_train)
+  # model = LogisticRegression()
+  # scores = cross_val_score(model, X_train_scaled, y_train, cv=5) # Passes scaled data
+  # This is subtly wrong: scaler was fit on ALL X_train folds before CV started.
+  # Correct way: cross_val_score(Pipeline([('scaler', StandardScaler()), ('model', LogisticRegression())]), X_train, y_train, cv=5)
+
+  # Invalid: Ignoring Missing Values implicitly
+  # df_with_nans = pd.DataFrame({'a': [1, np.nan, 3], 'b': [4, 5, 6]})
+  # model = LogisticRegression().fit(df_with_nans.drop('b', axis=1), [0, 1, 0]) # Might crash or behave unexpectedly
+  ```
+
+</example>

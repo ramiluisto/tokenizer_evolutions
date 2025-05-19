@@ -1,0 +1,226 @@
+---
+description: "This rule describes common patterns and best practices for training machine learning models, particularly focusing on frameworks like Scikit-learn, PyTorch, and TensorFlow/Keras. Apply when implementing training loops, evaluating models, using callbacks, or optimizing hyperparameters."
+globs: ""
+alwaysApply: false
+---
+
+# Machine Learning Model Training Patterns
+
+## Critical Rules
+
+- **Clear Separation:** Separate data loading/preprocessing, model definition, training loop logic, and evaluation into distinct functions or classes.
+- **Use Validation Set:** Always use a separate validation set (not the test set) during training to monitor performance, tune hyperparameters, and check for overfitting. The test set is ONLY for final evaluation after training is complete.
+- **Track Metrics:** Log key metrics during training and validation (e.g., loss, accuracy, F1-score, AUC) for each epoch or step. Use tools like TensorBoard, MLflow, or Weights & Biases for visualization and tracking.
+- **Early Stopping:** Implement early stopping based on validation set performance (e.g., stop training if validation loss hasn't improved for N epochs) to prevent overfitting and save computation time.
+- **Model Checkpointing:** Save model checkpoints periodically during training, especially the best performing model based on validation metrics. This allows resuming training or retrieving the best model.
+- **Hyperparameter Tuning:** Use systematic methods for hyperparameter tuning (e.g., Grid Search, Random Search, Bayesian Optimization) using the validation set. Do not tune on the test set.
+- **Reproducibility:** Set random seeds (`random`, `numpy`, `torch`, `tensorflow`) for reproducibility. Document library versions and configurations.
+- **Batching:** Train models using mini-batches of data. Choose an appropriate batch size based on dataset size, model complexity, and available memory (especially GPU memory).
+- **Optimizer and Learning Rate Scheduler:** Select an appropriate optimizer (e.g., Adam, SGD) and consider using a learning rate scheduler (e.g., ReduceLROnPlateau, StepLR) to adjust the learning rate during training.
+- **Regularization:** Apply regularization techniques (L1/L2, Dropout, Batch Normalization) as needed to prevent overfitting.
+- **Framework Idioms:** Follow idiomatic patterns for the chosen framework (e.g., `model.train()`/`model.eval()` modes in PyTorch, `fit`/`evaluate`/`predict` methods in Keras/Scikit-learn, using `tf.function` in TensorFlow).
+
+## Examples
+
+<example>
+  ```python
+  # Example using Scikit-learn Pipeline (integrates preprocessing)
+  from sklearn.model_selection import train_test_split, GridSearchCV
+  from sklearn.pipeline import Pipeline
+  from sklearn.preprocessing import StandardScaler
+  from sklearn.svm import SVC
+  from sklearn.metrics import classification_report
+  import numpy as np
+  
+# Assume X, y are loaded and are numpy arrays or pandas DataFrames
+
+# X, y = load_data()
+
+  X, y = np.random.rand(100, 10), np.random.randint(0, 2, 100)
+
+# Separate Test set FIRST (before any tuning)
+
+  X_temp, X_test, y_temp, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Use X_temp, y_temp for training and validation/hyperparameter tuning
+
+  X_train, X_val, y_train, y_val = train_test_split(X_temp, y_temp, test_size=0.25, random_state=42) # 0.25 * 0.8 = 0.2
+
+# Create pipeline
+
+  pipeline = Pipeline([
+      ('scaler', StandardScaler()),
+      ('svc', SVC(probability=True, random_state=42)) # Model
+  ])
+
+# Define hyperparameter grid for tuning (using validation set implicitly via CV)
+
+  param_grid = {
+      'svc__C': [0.1, 1, 10],
+      'svc__gamma': ['scale', 'auto']
+  }
+
+# Use GridSearchCV for hyperparameter tuning and cross-validation on the training data
+
+# Note: GridSearchCV refits the best model on the entire X_train + X_val combined after finding best params
+
+  search = GridSearchCV(pipeline, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
+  search.fit(X_temp, y_temp) # Fit on the combined train+validation set used for CV
+
+  print(f"Best parameters found: {search.best_params_}")
+  print(f"Best cross-validation score: {search.best_score_:.4f}")
+
+# Final evaluation on the *untouched* test set
+
+  best_model = search.best_estimator_
+  test_score = best_model.score(X_test, y_test)
+  print(f"Test set accuracy: {test_score:.4f}")
+  y_pred = best_model.predict(X_test)
+  print(classification_report(y_test, y_pred))
+
+# --- PyTorch Example Snippets (Conceptual) ---
+
+# import torch
+
+# import torch.nn as nn
+
+# import torch.optim as optim
+
+# from torch.utils.data import DataLoader, TensorDataset
+
+# from torch.utils.tensorboard import SummaryWriter # For logging
+
+# writer = SummaryWriter('runs/my_experiment') # Setup logger
+
+# model = MyModel(...).to(device)
+
+# optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# criterion = nn.CrossEntropyLoss()
+
+# train_loader = DataLoader(TensorDataset(X_train_tensor, y_train_tensor), batch_size=32, shuffle=True)
+
+# val_loader = DataLoader(TensorDataset(X_val_tensor, y_val_tensor), batch_size=32)
+
+# best_val_loss = float('inf')
+
+# epochs_no_improve = 0
+
+# early_stopping_patience = 5
+  
+# for epoch in range(num_epochs)
+
+# model.train() # Set train mode
+
+# running_loss = 0.0
+
+# for i, (inputs, labels) in enumerate(train_loader)
+
+# inputs, labels = inputs.to(device), labels.to(device)
+
+# optimizer.zero_grad()
+
+# outputs = model(inputs)
+
+# loss = criterion(outputs, labels)
+
+# loss.backward()
+
+# optimizer.step()
+
+# running_loss += loss.item()
+
+# # Log training loss
+
+# writer.add_scalar('Loss/train', running_loss / len(train_loader), epoch)
+
+# # Validation loop
+
+# model.eval() # Set eval mode
+
+# val_loss = 0.0
+
+# with torch.no_grad()
+
+# for inputs, labels in val_loader
+
+# inputs, labels = inputs.to(device), labels.to(device)
+
+# outputs = model(inputs)
+
+# loss = criterion(outputs, labels)
+
+# val_loss += loss.item()
+
+# avg_val_loss = val_loss / len(val_loader)
+
+# writer.add_scalar('Loss/validation', avg_val_loss, epoch)
+
+# # Model Checkpointing & Early Stopping
+
+# if avg_val_loss < best_val_loss
+
+# best_val_loss = avg_val_loss
+
+# torch.save(model.state_dict(), 'best_model.pth') # Save best model
+
+# epochs_no_improve = 0
+
+# else
+
+# epochs_no_improve += 1
+
+# if epochs_no_improve == early_stopping_patience
+
+# print("Early stopping!")
+
+# break
+
+# writer.close()
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  from sklearn.model_selection import train_test_split
+  from sklearn.preprocessing import StandardScaler
+  from sklearn.linear_model import LogisticRegression
+  import numpy as np
+
+  X, y = np.random.rand(100, 10), np.random.randint(0, 2, 100)
+
+  # Invalid: Tuning hyperparameters on the test set
+  # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+  # best_score = -1
+  # best_C = None
+  # for C in [0.1, 1, 10]:
+  #     model = Pipeline([('scaler', StandardScaler()), ('lr', LogisticRegression(C=C))])
+  #     model.fit(X_train, y_train)
+  #     score = model.score(X_test, y_test) # Evaluating on test set during tuning!
+  #     if score > best_score:
+  #         best_score = score
+  #         best_C = C 
+  # # Final evaluation uses the same test set - optimistic bias!
+
+  # Invalid: No separate validation set (only train/test)
+  # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+  # model = LogisticRegression()
+  # model.fit(X_train, y_train) # Train on training data
+  # # No validation step for checking overfitting or tuning
+  # test_score = model.score(X_test, y_test) # Evaluate directly on test
+
+  # Invalid: Forgetting model.eval() in PyTorch during validation/testing
+  # model.train() # Model remains in training mode
+  # with torch.no_grad():
+  #    # Validation/Test loop happens here, but dropout/batchnorm act as in training
+  #    pass
+  
+  # Invalid: Not setting random seeds
+  # Results may vary significantly between runs, making debugging hard
+
+  # Invalid: Not using pipelines when preprocessing needed in CV
+  # (See invalid example in data-preprocessing-agent.mdc)
+  ```
+
+</example>

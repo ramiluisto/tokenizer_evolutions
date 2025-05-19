@@ -1,0 +1,169 @@
+---
+description: "This rule outlines best practices for tracking and logging machine learning experiment results, including metrics, hyperparameters, code versions, and model artifacts. Apply when running ML experiments to ensure reproducibility, facilitate comparison, and manage model lifecycle."
+globs: ""
+alwaysApply: false
+---
+
+# ML Experiment Results Tracking
+
+## Critical Rules
+
+- **Use Tracking Tools:** Employ dedicated experiment tracking tools like MLflow, Weights & Biases (W&B), or TensorBoard. Avoid manual tracking in spreadsheets or text files for anything beyond simple experiments.
+- **Log Hyperparameters:** Log ALL relevant hyperparameters used for each experiment run (e.g., learning rate, batch size, model architecture details, optimizer settings, regularization strength).
+- **Log Metrics:** Log key performance metrics on training, validation, and test sets (e.g., loss, accuracy, precision, recall, F1-score, AUC, custom metrics). Log metrics periodically during training (e.g., per epoch).
+- **Log Code Version:** Associate each experiment run with the specific code version used (e.g., Git commit hash). Tools like MLflow and W&B often have integrations for this.
+- **Log Datasets:** Record information about the dataset(s) used (e.g., version, source, preprocessing steps, dataset hash) to ensure runs are comparable.
+- **Log Model Artifacts:** Save trained model files (checkpoints, final model), tokenizer files, preprocessor objects (like fitted scalers/encoders), and potentially evaluation results (like confusion matrices or prediction files) as artifacts associated with the run.
+- **Unique Run Identification:** Ensure each experiment run has a unique identifier. Tracking tools usually handle this automatically.
+- **Organize Experiments:** Group related runs into experiments or projects within the tracking tool for better organization.
+- **Environment Information:** Optionally, log information about the execution environment (e.g., Python version, key library versions, hardware used like GPU type) for debugging and reproducibility.
+- **Parameterize Scripts:** Write training scripts that accept hyperparameters and configuration options as command-line arguments or through configuration files, making it easier to launch different runs.
+
+## Examples
+
+<example>
+  ```python
+  # Example using MLflow (Conceptual)
+  import mlflow
+  import mlflow.sklearn # Or mlflow.pytorch, mlflow.tensorflow, etc.
+  from sklearn.model_selection import train_test_split
+  from sklearn.ensemble import RandomForestClassifier
+  from sklearn.metrics import accuracy_score
+  import git
+  import os
+  import numpy as np
+
+# --- Setup ---
+
+# Assume X, y are loaded
+
+# X, y = load_data()
+
+  X, y = np.random.rand(100, 10), np.random.randint(0, 2, 100)
+  X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Get current Git commit hash
+
+  try:
+      repo = git.Repo(search_parent_directories=True)
+      git_commit = repo.head.object.hexsha
+  except Exception:
+      git_commit = "unknown"
+
+# --- MLflow Tracking ---
+
+# Set experiment name (groups runs)
+
+  mlflow.set_experiment("Random Forest Classification")
+
+# Start an MLflow run (automatically creates a unique run ID)
+
+  with mlflow.start_run() as run:
+      print(f"MLflow Run ID: {run.info.run_id}")
+      mlflow.set_tag("git_commit", git_commit)
+      mlflow.set_tag("developer", "AI Assistant")
+
+      # 1. Log Hyperparameters
+      n_estimators = 150
+      max_depth = 10
+      mlflow.log_param("n_estimators", n_estimators)
+      mlflow.log_param("max_depth", max_depth)
+      mlflow.log_param("random_state", 42)
+
+      # 2. Train Model 
+      model = RandomForestClassifier(
+          n_estimators=n_estimators, 
+          max_depth=max_depth, 
+          random_state=42
+      )
+      model.fit(X_train, y_train)
+
+      # 3. Log Metrics
+      y_pred_train = model.predict(X_train)
+      y_pred_test = model.predict(X_test)
+      train_accuracy = accuracy_score(y_train, y_pred_train)
+      test_accuracy = accuracy_score(y_test, y_pred_test)
+
+      mlflow.log_metric("train_accuracy", train_accuracy)
+      mlflow.log_metric("test_accuracy", test_accuracy)
+
+      # 4. Log Model Artifact
+      # Autologging often handles this, but can be done manually:
+      mlflow.sklearn.log_model(model, "random-forest-model")
+
+      # 5. Log Other Artifacts (e.g., feature list, plots)
+      # with open("features.txt", "w") as f:
+      #    f.write("\n".join(X_train.columns if hasattr(X_train, 'columns') else [f'feat_{i}' for i in range(X_train.shape[1])]))
+      # mlflow.log_artifact("features.txt")
+      
+      # (Example: Log confusion matrix plot using matplotlib)
+      # from sklearn.metrics import ConfusionMatrixDisplay
+      # import matplotlib.pyplot as plt
+      # fig, ax = plt.subplots()
+      # ConfusionMatrixDisplay.from_predictions(y_test, y_pred_test, ax=ax)
+      # plt.savefig("confusion_matrix.png")
+      # mlflow.log_artifact("confusion_matrix.png")
+
+  print(f"MLflow Run completed. Check the MLflow UI.")
+
+# --- TensorBoard Example Snippet (PyTorch) ---
+
+# from torch.utils.tensorboard import SummaryWriter
+
+# writer = SummaryWriter(log_dir=f'runs/experiment_name/{run_id}')
+
+# writer.add_hparams(
+
+# {'lr': learning_rate, 'batch_size': batch_size, 'optimizer': 'Adam'}
+
+# {'hparam/accuracy': test_accuracy, 'hparam/loss': test_loss}
+
+# )
+
+# writer.add_scalar('Loss/train', train_loss_epoch, global_step=epoch)
+
+# writer.add_scalar('Accuracy/validation', val_acc_epoch, global_step=epoch)
+
+# writer.close()
+
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  from sklearn.ensemble import RandomForestClassifier
+  from sklearn.model_selection import train_test_split
+  from sklearn.metrics import accuracy_score
+  import numpy as np
+
+  X, y = np.random.rand(100, 10), np.random.randint(0, 2, 100)
+  X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+  # Invalid: No tracking tool used
+  
+  # Invalid: Manual tracking in prints/comments (hard to compare/manage)
+  learning_rate = 0.01 # Maybe logged somewhere?
+  print(f"Training with n_estimators=100") # Hard to parse later
+  model = RandomForestClassifier(n_estimators=100, random_state=42)
+  model.fit(X_train, y_train)
+  accuracy = accuracy_score(y_test, model.predict(X_test))
+  print(f"Test Accuracy: {accuracy}") # How does this compare to previous runs?
+
+  # Invalid: Hyperparameters not logged systematically
+  # Maybe they were command-line args, but not saved with results
+
+  # Invalid: Code version not tracked
+  # If code changes, unsure which version produced which result
+
+  # Invalid: Model artifacts not saved or linked to run
+  # model.save("my_model.pkl") # How do we know which run created this file?
+  
+  # Invalid: Using TensorBoard just for loss curves without logging hyperparameters
+  # from torch.utils.tensorboard import SummaryWriter
+  # writer = SummaryWriter() # Default log dir, no run ID or experiment name
+  # writer.add_scalar('Loss/train', train_loss_epoch, global_step=epoch)
+  # # Missing: writer.add_hparams(...) to link metrics to hyperparameters
+  # writer.close()
+  ```
+
+</example>

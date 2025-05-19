@@ -1,0 +1,123 @@
+---
+description: "This rule provides guidelines and best practices for developing Django applications, covering models, views, templates, forms, and ORM usage. Apply when writing or reviewing Django-specific Python code to ensure adherence to framework conventions, promote security, and optimize performance."
+globs: 
+alwaysApply: false
+---
+
+# Django Development Best Practices
+
+## Critical Rules
+
+- Utilize Django's ORM effectively for database interactions; avoid raw SQL unless necessary and justified.
+- Follow the "Fat Models, Thin Views" principle: Place business logic primarily within models or dedicated service layers, keeping views focused on request/response handling.
+- Employ Django Forms (`forms.Form`, `forms.ModelForm`) for robust input validation, cleaning, and HTML form generation.
+- Keep templates free of complex business logic. Use template tags and filters for presentation logic only.
+- Leverage Django's built-in security features: Ensure CSRF protection is enabled, use `django.utils.html.escape` or template autoescaping to prevent XSS, and handle permissions correctly.
+- Prefer Class-Based Views (CBVs) for standard CRUD operations and reusable view logic (e.g., `ListView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`). Use Function-Based Views (FBVs) for simple or highly custom view logic.
+- Structure projects with reusable Django apps, ensuring each app has a single, clear responsibility.
+- Write tests (unit, integration) for models, views, forms, and utility functions using Django's testing framework (`unittest` or `pytest-django`).
+- Manage settings securely and appropriately for different environments (development, staging, production), often using environment variables or separate settings files.
+- Use Django's database migration system (`makemigrations`, `migrate`) consistently to manage schema changes.
+
+## Examples
+
+<example>
+  ```python
+  # models.py
+  class Article(models.Model):
+      title = models.CharField(max_length=200)
+      content = models.TextField()
+      pub_date = models.DateTimeField(auto_now_add=True)
+
+      def get_word_count(self):
+          # Example of logic in the model
+          return len(self.content.split())
+
+# forms.py
+
+  from django import forms
+
+  class ArticleForm(forms.ModelForm):
+      class Meta:
+          model = Article
+          fields = ['title', 'content']
+
+# views.py
+
+  from django.views.generic import ListView, CreateView
+  from django.urls import reverse_lazy
+  from .models import Article
+  from .forms import ArticleForm
+
+  class ArticleListView(ListView):
+      model = Article
+      template_name = 'articles/list.html' # Explicit template name
+
+  class ArticleCreateView(CreateView):
+      model = Article
+      form_class = ArticleForm
+      template_name = 'articles/create.html'
+      success_url = reverse_lazy('article-list') # Use reverse_lazy for success URLs
+
+# urls.py
+
+  from django.urls import path
+  from . import views
+
+  urlpatterns = [
+      path('', views.ArticleListView.as_view(), name='article-list'),
+      path('create/', views.ArticleCreateView.as_view(), name='article-create'),
+  ]
+
+# template.html (example usage)
+
+  {# Uses Django template tags/filters correctly #}
+  <h1>{{ article.title }}</h1>
+  <p>Word Count: {{ article.get_word_count }}</p>
+  <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Save</button>
+  </form>
+  ```
+</example>
+
+<example type="invalid">
+  ```python
+  # views.py (Bad Practice: Raw SQL in view)
+  from django.db import connection
+  from django.shortcuts import render
+
+  def article_detail_bad(request, article_id):
+      with connection.cursor() as cursor:
+          # Avoid raw SQL like this unless absolutely necessary
+          cursor.execute("SELECT title, content FROM myapp_article WHERE id = %s", [article_id])
+          row = cursor.fetchone()
+      # Manual HTML rendering is less ideal than templates
+      return render(request, 'articles/detail_manual.html', {'title': row[0], 'content': row[1]})
+
+# template.html (Bad Practice: Complex logic in template)
+
+  <h1>Article Details</h1>
+  {% if article.content|length > 500 and request.user.is_staff %}
+      {# Complex conditional logic belongs in the view or model #}
+      <p>This is a very long article!</p>
+  {% endif %}
+  <p>{{ article.content }}</p>
+
+# forms.py (Bad Practice: Manual form processing in view instead of Django Forms)
+
+  def process_form_bad(request):
+      if request.method == 'POST':
+          title = request.POST.get('title')
+          content = request.POST.get('content')
+          # Manual validation and saving is error-prone
+          if not title or not content:
+              # Handle error manually
+              pass
+          else:
+              # Save manually
+              pass
+
+  ```
+</example>
