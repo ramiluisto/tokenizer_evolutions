@@ -38,6 +38,6 @@ if __name__ == "__main__":
 
     inp = Path("combined_data")
 
-    for vocab_size in tqdm(range(1000, 100000, 1000)):
+    for vocab_size in tqdm(range(1000, 90000, 5000)):
         folder = Path('./tokenizers/size_variation_{}'.format(vocab_size))
         train(inp, vocab_size, folder)
