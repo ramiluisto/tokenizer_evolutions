@@ -75,9 +75,9 @@ def train_from_corpus(
 # --------------------------------------------------------------------------- #
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--vocab_start", type=int, default=85_000)
-    p.add_argument("--vocab_end", type=int, default=200_000)
-    p.add_argument("--vocab_step", type=int, default=15_000)
+    p.add_argument("--vocab_start", type=int, default=190_000)
+    p.add_argument("--vocab_end", type=int, default=500_000)
+    p.add_argument("--vocab_step", type=int, default=20_000)
     p.add_argument("--input_dir", type=Path, default=Path("data/wikipedia"))
     p.add_argument("--cache", type=Path, default=Path("cache/wikipedia.pickle"))
     p.add_argument("--out_root", type=Path, default=Path("tokenizers/wikipedia"))
