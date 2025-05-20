@@ -29,6 +29,7 @@ combined_data/
 models/
 data/
 tokenizers/
+cache/
 
 # Virtual Environment
 venv/
